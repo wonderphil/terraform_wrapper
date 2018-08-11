@@ -95,6 +95,7 @@ After the folder layout and cofig files are created, it will run terraform to do
 \*\*\* See manually built items below.
 
 ### build
+Build is what does all the hard work.  This is what should make life better when using terraform.  The basis of this script was, at the time we had so many different configs for so many regions, for different apps, environments and it was a massive mess.  So to clean it up and make managable, we split config up in different layers.  Promblem now is every time someone runs terraform they need to remember to add each config file to the command and also had to remember to switch workspaces.  Come in build, build removes all that, now when someone wants to run terraform, all the need to know is what service they are building, which region and enviroment they are building in, build will then do the rest.
 
 
 # Requirements for AWS Creds
