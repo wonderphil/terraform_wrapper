@@ -73,6 +73,8 @@ repo-root
 │        │  main.tf
 │        │  outputs.tf
 │        │  variables.tf
+│        │  README.md
+│        │  CHANGELOG.md
 │        │
 │        └─── config
 │             │ backend.conf
