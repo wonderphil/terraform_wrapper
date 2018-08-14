@@ -1,6 +1,9 @@
 # Terraform Wrapper
 *by Phil Davies on [Github](https://github.com/wonderphil)*
 
+# READ ME STILL NEEDS TO BE FINISHED
+
+**
 ## Forwarning:
 Firstly I have written this a couple times because I wasn't happy with the complexity that terraform had, and my requirement was to make infra-as-code as easy for the Dev's, DevOps, Qa's and everyone else in the IT team I was in.  When I started writing the first version of this I was just a lonely old DevOps guy trying to change the world, I wrote it in ruby, which I had self-taught and thus I say this;  I probably did things in ways I shouldn't have or in ways that could be better, I am happy for pull request and I am happy for suggestions, either  to make it better or new features.
 
@@ -118,14 +121,14 @@ The scripts are using the standard aws profile setup, this way you have lots of 
 Example creds file:
 
 ```
-[profile somecompany-dev]
+[somecompany-dev]
 region = eu-west-1
 aws_access_key_id = xxxxxxxxxx
 aws_secret_access_key = xxxxxxxxxxxxxxxxxxxxxxxxx
 aws_session_token = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 aws_security_token = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-[profile somecompany-prod]
+[somecompany-prod]
 region = eu-west-1
 aws_access_key_id = yyyyyyyyyyyy
 aws_secret_access_key = yyyyyyyyyyyyyyyyyyyyyyyy
