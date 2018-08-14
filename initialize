@@ -1,0 +1,136 @@
+#!/usr/bin/env ruby
+require_relative 'lib/aws_lib'
+require_relative 'lib/ruby_utils'
+require_relative 'lib/terraform_lib'
+require 'colorize'
+require 'slop'
+require 'json'
+
+include AwsLib
+include RubyUtils
+include TerraformLib
+
+# Defind some basic vars required
+base_dir              = Dir.pwd
+accounts_path         = "#{base_dir}/services/aws_accounts"
+shared_config         = "#{base_dir}/shared_config"
+
+system "clear"
+
+puts "*********************************************************".green
+puts "**        Welcome to Terraform AWS initalize           **".green
+puts "**  This script expects that you have a blank aws      **".green
+puts "**  account, will full permissions.                    **".green
+puts "**  AWS keys must be apart of your aws creds file for  **".green
+puts "**  this to work.                                      **".green
+puts "**                                                     **".green
+puts "**  This will build the base requirements for          **".green
+puts "**  terraform wrapper to work with your aws accounts.  **".green
+puts "**  The first account that this will built must be     **".green
+puts "**  the PRODUCTION account.                            **".green
+puts "**                                                     **".green
+puts "**  ".green + "Please ensure the following values are in the".red + "      **".green
+puts "**  ".green + "shared config folder for the prod account:".red + "         **".green
+puts "**  ".green + "aws_account_id, aws_profile, is_prod, environment".red + "  **".green
+puts "**                                                     **".green
+puts "*********************************************************".green
+
+puts "Do you wish to continue?(Y/N)".black.on_white 
+if !STDIN.gets.chomp.downcase == 'y'
+  puts "User ended script".red
+  exit 0
+else
+  
+  puts "Who are the owners of Production account?".black.on_white
+  owners = STDIN.gets.chomp.downcase
+
+  puts "In which Region do you want to build in?".black.on_white
+  region = STDIN.gets.chomp.downcase
+
+  puts "What is the name of you production environment? i.e. prod".black.on_white
+  env_name = STDIN.gets.chomp.downcase
+
+  puts "What is the name of you aws profile which contains your creds?".black.on_white
+  aws_profile = STDIN.gets.chomp.downcase
+
+  puts "Checking if shared config file exists....".magenta
+  check_file("#{shared_config}/#{env_name}/#{region}.tfvars")
+  
+  tf_config  = "#{env_name}-#{region}-terraform.tfvars"
+  templates  = "#{base_dir}/lib/init_templates/aws_accounts/"
+
+  puts "First creating aws accounts service files under #{accounts_path}".magenta
+  FileUtils.mkdir_p accounts_path
+  FileUtils.cp_r "#{templates}/.", accounts_path
+  FileUtils.mkdir_p "#{accounts_path}/configs"
+
+  puts "updating config for aws_accounts services".magenta
+  
+  open("#{accounts_path}/configs/#{tf_config}", 'w') do |file|
+    file.puts "service    = \"aws_accounts\""
+    file.puts "role       = \"account_setup\""
+    file.puts "owners     = \"#{owners}\""
+    file.puts "aws_region = \"#{region}\""
+  end
+  
+  terraform_ws(env_name, region, accounts_path)
+  terraform_init(env_name, region, accounts_path, true)
+  config_hash = { "service" => "#{accounts_path}/configs/#{tf_config}", "shared" => "#{shared_config}/#{env_name}/#{region}.tfvars"}
+  terraform_other('apply', env_name, region, accounts_path, config_hash, true, true )
+
+  puts "Creating new backend config....".magenta
+  outputs = terraform_output(accounts_path)
+  config = JSON.parse(outputs)
+  open("#{accounts_path}/configs/backend.conf", 'w') do |file|
+    file.puts "encrypt          = true "
+    file.puts "dynamodb_table   = \"terraform-state\""
+    file.puts "kms_key_id       = \"#{config["s3_kms_key_id"]["value"]}\""
+    file.puts "bucket           = \"#{config["s3_terraform_state_id"]["value"][0]}\""
+    file.puts "region           = \"#{config["s3_terraform_state_region"]["value"][0]}\""
+    file.puts "profile          = \"#{aws_profile}\""
+    file.puts "key              = \"backend-aws-accounts-#{region}-terraform.tfstate\""
+  end
+
+  puts "updating main.tf with new backend config....".magenta
+  open("#{accounts_path}/main.tf", 'a') do |file|
+    file.puts "\n\n"
+    file.puts 'terraform {'
+    file.puts '  backend "s3" {}'
+    file.puts '}'
+  end
+
+  puts "Re-initiailizing the aws_accounts service so that the state is stored in s3/dynamodb....".green
+  
+  if !AwsLib::s3_check(aws_profile, region, config["s3_terraform_state_id"]["value"][0])
+    puts "ERROR - S3 Bucket doesn't exist, You need to run the account setup service to setup aws production account!".red
+    exit 1
+  end
+  Dir.chdir(accounts_path){
+    system "terraform init -backend-config=configs/backend.conf -force-copy"
+  }
+
+  puts "Updating build config file....".magenta
+  config_file = File.read('build_config.json')
+  hash = JSON.parse(config_file)
+  hash["state_bucket"] = config["s3_terraform_state_id"]["value"][0]
+  hash["state_kms"] = config["s3_kms_key_id"]["value"]
+  open("build_config.json", "w") do |file|
+    file.puts JSON.pretty_generate hash
+  end
+  puts "Updating global backend config file....".magenta
+  open("#{shared_config}/global/state.conf", "w") do |file|
+    file.puts "\n\n"
+    file.puts "remote_state_lock_table          = \"#{config["terraform_dynamodb_table_id"]["value"][0]}\""
+    file.puts "remote_state_s3_kms_key          = \"#{config["s3_kms_key_id"]["value"]}\""
+    file.puts "remote_state_bucket              = \"#{config["s3_terraform_state_id"]["value"][0]}\""
+    file.puts "remote_state_profile             = \"#{aws_profile}\""
+    file.puts "remote_state_region              = \"#{config["s3_terraform_state_region"]["value"][0]}\""
+    file.puts "\n\n\n\n\n\n"
+    file.puts '## Place Other Remote state keys below to share access between all services'
+    file.puts "remote_state_aws_accounts_key    = \"backend-aws-accounts-#{region}-terraform.tfstate\""
+  end
+
+  
+  puts "Ready to rock n roll.  you can now run the build command for any service you want to build.".magenta
+  
+end

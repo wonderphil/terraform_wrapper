@@ -1,8 +1,6 @@
 # Terraform Wrapper
 *by Phil Davies on [Github](https://github.com/wonderphil)*
 
-Simplifying terraform, aws and infra-as-code
-
 ## Forwarning:
 Firstly I have written this a couple times because I wasn't happy with the complexity that terraform had, and my requirement was to make infra-as-code as easy for the Dev's, DevOps, Qa's and everyone else in the IT team I was in.  When I started writing the first version of this I was just a lonely old DevOps guy trying to change the world, I wrote it in ruby, which I had self-taught and thus I say this;  I probably did things in ways I shouldn't have or in ways that could be better, I am happy for pull request and I am happy for suggestions, either  to make it better or new features.
 
@@ -22,6 +20,13 @@ Right with that out of the way, lets get to the fun stuff
 # General Terms Used
  - **Service** - A service is a reference to a group of apps/infra that provides some function.  i.e. a service could be built from multiple apps including backend and frontend.
  - 
+
+# Getting Started - Manually Built Items
+
+First thing is first, before any of this can work, we need to have an AWS account setup and some sort of access to that account.  My suggestion would be that you create the account, create a temp user with full access and keys, add those keys to your aws creds file.
+
+Then you can run the following:
+
 
 # Files
 
@@ -94,11 +99,10 @@ After the folder layout and cofig files are created, it will run terraform to do
 
 \*\* See requirements for aws creds below.
 
-\*\*\* See manually built items below.
+\*\*\* See manually built items above.
 
 ### build
 Build is what does all the hard work.  This is what should make life better when using terraform.  The basis of this script was, at the time we had so many different configs for so many regions, for different apps, environments and it was a massive mess.  So to clean it up and make managable, we split config up in different layers.  Promblem now is every time someone runs terraform they need to remember to add each config file to the command and also had to remember to switch workspaces.  Come in build, build removes all that, now when someone wants to run terraform, all the need to know is what service they are building, which region and enviroment they are building in, build will then do the rest.
-
 
 # Requirements for AWS Creds
 

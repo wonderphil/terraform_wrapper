@@ -1,0 +1,24 @@
+{
+  "config_version": "0.0.1",
+  "default_envs": [
+    "prod",
+    "master",
+    "uat",
+    "staging",
+    "int",
+    "dev"
+  ],
+  "default_region": "eu-west-1",
+  "environment_prefix": "somecompany-",
+  "prod_profile": "somecompany-prod",
+  "state_bucket": "prod-eu-terraform",
+  "state_kms": "1111111-22222-3333-4444-55555",
+  "state_profile": "somecompany-prod",
+  "state_region": "eu-west-1",
+  "tamplate_files": [
+    "main.tf",
+    "outputs.tf",
+    "variables.tf"
+  ],
+  "terraform_version": "0.11.2"
+}

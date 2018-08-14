@@ -1,0 +1,115 @@
+#!/usr/bin/env ruby
+require_relative 'lib/aws_lib'
+require_relative 'lib/ruby_utils'
+require_relative 'lib/terraform_lib'
+require 'colorize'
+require 'slop'
+require 'json'
+
+include AwsLib
+include RubyUtils
+include TerraformLib
+
+# Defind some basic vars required
+base_dir              = Dir.pwd
+template_dir          = "#{base_dir}/services/!Template"
+shared_config_folder  = "#{base_dir}/shared_config"
+
+#### Read Config File
+config_file = File.read('build_config.json')
+config = JSON.parse(config_file)
+
+system "clear"
+puts "Starting Terraform new service generation".magenta
+puts "Checking to make sure everything is ready for generation of files".magenta
+
+#First check template exists
+puts "Checking that templates exists....".magenta
+check_folder?(template_dir)
+config["tamplate_files"].each do |file|
+  check_file("#{template_dir}/#{file}")
+end
+check_session(config["prod_profile"], config["state_region"])
+if !s3_check(config["prod_profile"], config["state_region"], config["state_bucket"])
+  puts "ERROR - S3 Bucket doesn't exist, means the prod environment in AWS isn't created right, please see devops...".red
+  exit 1
+end
+
+#Lets ask the user for all the required data
+puts "The following question will help build the base template for the service you are building".green
+puts " * Help with tagging of stuff built, used for billing, tracking".green
+puts " * Help build the names. The naming convention used with this tool is environment-location-app".green
+puts "For example if you are building a 'system' called jarvis".green
+puts "And this system is being built in aws, in a dev environment then the naming will be:".green
+puts "      dev-aws-jarvise".yellow
+puts "and the tags will be".green
+puts "      service => jarvis".yellow
+puts "      environment => dev".yellow
+puts "      location => aws".yellow
+puts "      owners => teamname".yellow
+puts "      Name => dev-aws-mapper".yellow
+puts "As you build this service you will have differnt components, which will be tagged with \"role\", but you can add that later.".magenta
+puts "Once role is added you can use it to change the name of the individual components, so that its not using service.".magenta
+
+
+puts "What is the name of the service that you are building?".black.on_white
+service = STDIN.gets.chomp.downcase
+
+puts "Which team owns this?".black.on_white
+team = STDIN.gets.chomp.downcase
+
+puts "Give a short description of what this service is and/or will do?".black.on_white
+description = STDIN.gets.chomp.downcase
+
+#Generate all the new paths required for new service
+service_path = "#{base_dir}/services/#{service}"
+config_path = "#{service_path}/configs"
+
+if check_folder?(service_path, true)
+  puts "ERROR - Seems like service already exist! Please check above folder.".red
+  exit 1
+else
+  puts "Creating new service folder....".magenta
+  FileUtils.mkdir_p service_path
+   
+  puts "Creating new service config folder....".magenta
+  FileUtils.mkdir_p config_path
+  
+  puts "Creating new config files....".magenta
+  build_tfvars( config["default_envs"],
+                config_path,
+                config["state_region"], 
+                team, 
+                service,
+                config["state_bucket"],
+                config["state_profile"], 
+                config["state_kms"]
+              )
+  
+  puts "Creating new readme and changelog files....".magenta
+  build_files(service_path, service, description, team)
+  
+  puts "Copying templated files....".magenta
+  FileUtils.cp_r "#{template_dir}/.", service_path
+
+  config["default_envs"].each do |env|
+    state_file = "#{env}-#{service}-#{config["default_region"]}-terraform-state.tfstate"
+    shared_config = "#{shared_config_folder}/#{env}/#{config["default_region"]}.tfvars"
+    
+    puts "Doing Terraform Init".magenta
+    terraform_init( env, 
+                    config["default_region"], 
+                    service_path, 
+                    config["state_profile"], 
+                    config["state_region"], 
+                    config["state_bucket"], 
+                    state_file )
+    
+    puts "Creating new environment called #{env}-#{config["default_region"]}".magenta
+    puts "#{env}-#{config["default_region"]}".green + " Workspace is being setup".magenta
+    terraform_ws(env, config["default_region"], service_path)
+    
+  end
+end
+puts ("Generation now Completed! Happy Terraforming").magenta
+

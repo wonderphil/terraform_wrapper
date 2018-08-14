@@ -1,0 +1,36 @@
+.DS_Store
+common.csv
+*~
+*dpkg-dist
+*.swp
+*.idea
+*.vagrant
+dev-bin/packer_cache
+.vscode/
+.cse*
+
+*/.terrform
+*/terreform.*
+
+# not required
+.terraform/
+**/*.tfstate
+**/*.tfstate.backup
+# have to generate so not needed
+terraform.tfvars
+*.backup
+
+# lets not commit logs
+log/
+**/logs
+.logs
+*.log
+
+.DS_Store
+**/.DS_Store
+services/**/.terraform
+
+# Password files
+shared_config/**/passwords
+
+temp/*

@@ -1,0 +1,109 @@
+#!/usr/bin/env ruby
+require_relative 'lib/aws_lib'
+require_relative 'lib/ruby_utils'
+require_relative 'lib/terraform_lib'
+require 'colorize'
+require 'slop'
+require 'json'
+
+include AwsLib
+include RubyUtils
+include TerraformLib
+
+
+opts = Slop.parse do |o|
+  o.string  '-a', '--action',             'Terraform action to run i.e. init, get, apply, plan, destroy', default: 'plan'
+  o.string  '-s', '--service',            'Services to build'
+  o.string  '-e', '--environment',        'The environment to build either play, dev, qa, uat, staging, prod'
+  o.string  '-r', '--region',             'Region to build in (default: eu-west-1)', default: 'eu-west-1'
+  o.bool    '-d', '--debug',              'Prints out all the variables used in script'
+  o.bool    '-y', '--auto_approve',       'Add Auto approve to terraform command', default: false
+  o.on      '-h', '--help',               'Prints help' do
+    puts o
+    exit 0
+  end
+  o.on      '-v', '--version',            'Print the version' do
+    puts 'build V 0.0.1'
+    exit 0
+  end
+end
+
+##### Check if service has been provided, otherwise nothing really going to happen
+if opts[:service].nil?
+  puts "Must provide the service name".red
+  exit 1
+end
+
+#### Read Config File
+config_file = File.read('build_config.json')
+config = JSON.parse(config_file)
+
+#defining all the differnt vars required
+base_dir                = Dir.pwd
+service_dir             = "#{base_dir}/services/#{opts[:service]}"
+state_file              = "#{opts[:environment]}-#{opts[:service]}-#{opts[:region]}-terraform-state.tfstate"
+full_env                = "#{config["environment_prefix"]}#{opts[:environment]}"
+tf_config_files         = { "service"         => "#{service_dir}/configs/#{opts[:environment]}-#{opts[:region]}-terraform.tfvars",
+                            "shared_folder"   => "#{base_dir}/shared_config/#{opts[:environment]}",
+                            "shared"          => "#{base_dir}/shared_config/#{opts[:environment]}/#{opts[:region]}.tfvars",
+                            "global"          => "#{base_dir}/shared_config/global/#{opts[:region]}.tfvars",
+                            "shared_backend"  => "#{base_dir}/shared_config/global/state.conf"
+                          }
+
+if opts[:debug]
+  puts "Debug enabled, vars are:".magenta
+  puts "Inputs where:".green
+  puts "   action = #{opts[:action]}".green
+  puts "   service = #{opts[:service]}".green
+  puts "   environment = #{opts[:environment]}".green
+  puts "   region = #{opts[:region]}".green
+  
+  puts "Config file vars where:".green
+  config.each do |k, v|
+    puts "   #{k} = #{v}".green
+  end
+  puts "Terraform Version required = #{config["terraform_version"]}".green
+  puts "Terraform config file vars are:".green
+  tf_config_files.each do |k,v|
+    puts "   #{k} = #{v}".green
+  end
+
+  puts "var base_dir = #{base_dir}".green
+  puts "var service_dir = #{service_dir}".green
+  puts "var state_file = #{state_file}".green
+  puts "var full_env = #{full_env}".green
+
+  puts 'Continue with build?(Y/N)'.black.on_white
+  continue = STDIN.gets.chomp.downcase
+  if continue != 'y'
+    puts "Exiting".red
+    exit 0
+  end
+end
+
+# Pre checks that everything is ready before running terraform
+puts "Checking for all dependency before running terraform".magenta
+puts "Checking terraform version....".magenta
+check_tf_version(config["terraform_version"])
+puts "Checking for AWS Creds....".magenta
+check_session(full_env, opts[:region])
+puts "Checking for Service folder....".magenta
+check_folder?(service_dir)
+puts "Checking for Config....".magenta
+check_file(tf_config_files["service"])
+
+puts "Running Terraform #{opts[:action]}....".magenta
+
+case opts[:action].downcase
+when "init"
+  terraform_init(opts[:environment], opts[:region], config["prod_profile"], config["prod_region"], config["state_bucket"], state_file, service_dir)
+when "get"
+  terraform_get(opts[:environment], opts[:region], service_dir)
+when "import"
+  terraform_import(opts[:environment], opts[:region], service_dir, tf_config_files)
+when "plan", "apply", "destroy", "refresh"
+  terraform_other(opts[:action], opts[:environment], opts[:region], service_dir, tf_config_files, opts[:auto_approve])
+else
+  puts "Looks like Phil hasn't setup that action yet.  You'll need to look at it by hand".red
+  exit 1
+end
