@@ -36,15 +36,17 @@ module TerraformLib
     }
   end
 
-  def terraform_init(env, region, service_dir, state_profile='', state_region='', bucket='', file='', init_script= false)
+  def terraform_init(env, region, service_dir, state_profile='', state_region='', bucket='', file='', init_script='')
+
     puts "Environment set to: ".magenta + "#{env}".green + " and region is set to ".magenta + "#{region}".green
-    if init_script == false
+    if init_script != true
       puts "Terraform state will be synced to ".magenta + "s3://#{bucket}/#{file}".green + " in the Production account.".magenta
 
       if !AwsLib::s3_check(state_profile, state_region, bucket)
         puts "ERROR - S3 Bucket doesn't exist, You need to run the account setup service to setup aws production account!".red
         exit 1
       end
+      puts "****"
       cmd_args = "-backend-config=configs/backend.conf -get=true"
     else
       cmd_args = "-get=true"
@@ -74,17 +76,16 @@ module TerraformLib
   def terraform_import(env, region, service_dir, config_hash)
     puts "Environment set to: ".magenta + "#{env}".green + " and region is set to ".magenta + "#{region}".green
     
-    puts "What is the resource that you want to import? e.g. this is how its defined in terraform code. ".brown
-    puts "Resource \"aws_vpn_gateway\" \"vpn_gw\" would be aws_vpn_gateway.vpn_gw".brown
+    puts "What is the resource that you want to import? e.g. this is how its defined in terraform code. ".yellow
+    puts "Resource \"aws_vpn_gateway\" \"vpn_gw\" would be aws_vpn_gateway.vpn_gw".yellow
     import_add = (STDIN.gets).chomp
 
-    puts "What is the resource id in aws you want to import? e.g. the id from aws console vgw-ee00329a".brown 
+    puts "What is the resource id in aws you want to import? e.g. the id from aws console vgw-ee00329a".yellow 
     import_id = (STDIN.gets).chomp
 
     cmd_agrs = "import -var-file=#{config_hash["service"]} -var-file=#{config_hash["shared"]} -var-file=#{config_hash["global"]} -var-file=#{config_hash["shared_backend"]} #{import_add} #{import_id}"
     Dir.chdir(service_dir){
-      system "terraform workspace select #{env}"
-      system "terraform workspace show"
+      terraform_ws(env, region, service_dir)
       system "terraform #{cmd_agrs}"
     }
     puts "Terraform import completed".magenta
@@ -98,7 +99,7 @@ module TerraformLib
     }
   end
 
-  def terraform_other(action, env, region, service_dir, config_hash, auto_approve=false, init_script=false)
+  def terraform_other(action, env, region, service_dir, config_hash, auto_approve='', init_script='')
     puts "Environment set to: ".magenta + "#{env}".green + " and region is set to ".magenta + "#{region}".green
     if auto_approve && action == 'apply'
       cmd_args = "#{action} -auto-approve "
@@ -108,7 +109,7 @@ module TerraformLib
       cmd_args = "#{action} "
     end
 
-    if init_script == false
+    if init_script != true
       passwords = "#{config_hash["shared_folder"]}/passwords"
       cmd_args = "#{cmd_args} -var-file=#{config_hash["service"]} -var-file=#{config_hash["shared"]} -var-file=#{config_hash["global"]} -var-file=#{config_hash["shared_backend"]}"
       if File.file?(passwords) 
@@ -117,8 +118,11 @@ module TerraformLib
     else
       cmd_args = "#{cmd_args} -var-file=#{config_hash["service"]} -var-file=#{config_hash["shared"]}"
     end
+    
     Dir.chdir(service_dir){
+      terraform_ws(env, region, service_dir)
       puts "Running terraform ".magenta + "#{action}".green + " action now:".magenta
+      puts cmd_args
       system "terraform #{cmd_args}"
     }
   end

@@ -74,7 +74,7 @@ else
   end
   
   terraform_ws(env_name, region, accounts_path)
-  terraform_init(env_name, region, accounts_path, true)
+  terraform_init(env_name, region, accounts_path, init_script=true)
   config_hash = { "service" => "#{accounts_path}/configs/#{tf_config}", "shared" => "#{shared_config}/#{env_name}/#{region}.tfvars"}
   terraform_other('apply', env_name, region, accounts_path, config_hash, true, true )
 

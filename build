@@ -96,7 +96,7 @@ puts "Running Terraform #{opts[:action]}....".magenta
 
 case opts[:action].downcase
 when "init"
-  terraform_init(opts[:environment], opts[:region], config["prod_profile"], config["prod_region"], config["state_bucket"], state_file, service_dir)
+  terraform_init(opts[:environment], opts[:region], service_dir, config["state_profile"], config["state_region"], config["state_bucket"], state_file)
 when "get"
   terraform_get(opts[:environment], opts[:region], service_dir)
 when "import"
