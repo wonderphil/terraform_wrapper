@@ -122,7 +122,6 @@ module TerraformLib
     Dir.chdir(service_dir){
       terraform_ws(env, region, service_dir)
       puts "Running terraform ".magenta + "#{action}".green + " action now:".magenta
-      puts cmd_args
       system "terraform #{cmd_args}"
     }
   end
